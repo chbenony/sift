@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
+	"os"
+	"time"
 )
 
 type AnthropicRequest struct {
@@ -12,8 +15,8 @@ type AnthropicRequest struct {
 }
 
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string          `json:"role"`
+	Content json.RawMessage `json:"content"`
 }
 
 type Content struct {
@@ -26,17 +29,23 @@ type AnthropicResponse struct {
 	StopReason string    `json:"stop_reason"`
 }
 
-func ServeHttp(w http.ResponseWriter, r *http.Request) {
-	_, err := w.Write([]byte(`hello world`))
-	if err != nil {
-		log.Printf("error writing response %v", err)
-	}
-}
-
 func main() {
-	http.Handle("/", http.HandlerFunc(ServeHttp))
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	client := &http.Client{Timeout: time.Second * 10}
+
+	http.Handle("/", http.HandlerFunc(chatHandler(apiKey, client)))
 	err := http.ListenAndServe(":9000", nil)
 	if err != nil {
 		log.Fatalf("error")
+	}
+}
+
+func chatHandler(apiKey string, client *http.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if apiKey == "" {
+			http.Error(w, "server is misconfigured", http.StatusInternalServerError)
+			return
+		}
+
 	}
 }
