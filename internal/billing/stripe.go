@@ -9,26 +9,17 @@ import (
 )
 
 type StripeReporter struct {
-	client      *stripe.Client
-	customerMap map[string]string
+	client *stripe.Client
 }
 
-func NewStripeReporter(apiKey string, customerMap map[string]string) (*StripeReporter, error) {
+func NewStripeReporter(apiKey string) (*StripeReporter, error) {
 	sc := stripe.NewClient(apiKey)
 	return &StripeReporter{
-		client:      sc,
-		customerMap: customerMap,
+		client: sc,
 	}, nil
 }
 
-func (sp *StripeReporter) RecordUsage(ctx context.Context, identity string, inputTokens, outputTokens int64) error {
-
-	// this checks whether the identity of who is making the call maps to a
-	// Stripe customerID
-	customerID, ok := sp.customerMap[identity]
-	if !ok {
-		return fmt.Errorf("no stripe customer mapped for identity %q", identity)
-	}
+func (sp *StripeReporter) RecordUsage(ctx context.Context, customerID string, inputTokens, outputTokens int64) error {
 
 	events := []struct {
 		eventName string

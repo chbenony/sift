@@ -7,6 +7,11 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sift/internal/auth"
+	"sift/internal/billing"
+
+	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
+	"github.com/auth0/go-jwt-middleware/v3/validator"
 )
 
 var (
@@ -35,9 +40,15 @@ type Content struct {
 type AnthropicResponse struct {
 	Content    []Content `json:"content"`
 	StopReason string    `json:"stop_reason"`
+	Usage      Usage     `json:"usage"`
 }
 
-func chatHandler(apiKey string, client *http.Client) http.HandlerFunc {
+type Usage struct {
+	InputTokens  int64 `json:"input_tokens"`
+	OutputTokens int64 `json:"output_tokens"`
+}
+
+func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if apiKey == "" {
 			http.Error(w, "server is misconfigured", http.StatusInternalServerError)
@@ -63,6 +74,17 @@ func chatHandler(apiKey string, client *http.Client) http.HandlerFunc {
 		req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, messagesURL, bytes.NewReader(body))
 		if err != nil {
 			http.Error(w, "failed to build upstream request", http.StatusBadRequest)
+			return
+		}
+
+		usrIdentity, err := jwtmiddleware.GetClaims[*validator.ValidatedClaims](r.Context())
+		if err != nil {
+			http.Error(w, "failed to get claims", http.StatusInternalServerError)
+			return
+		}
+		claims, ok := usrIdentity.CustomClaims.(*auth.CustomClaims)
+		if !ok {
+			http.Error(w, "failed to get stripe customer id", http.StatusInternalServerError)
 			return
 		}
 
@@ -98,6 +120,12 @@ func chatHandler(apiKey string, client *http.Client) http.HandlerFunc {
 		w.WriteHeader(resp.StatusCode)
 		if _, err := w.Write(respBody); err != nil {
 			log.Printf("error writing response to caller: %v", err)
+		}
+
+		err = reporter.RecordUsage(r.Context(), claims.StripeCustomerID,
+			anthropicResp.Usage.InputTokens, anthropicResp.Usage.OutputTokens)
+		if err != nil {
+			log.Printf("failed to get user's record usage: %v", err)
 		}
 
 	}
