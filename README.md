@@ -28,7 +28,7 @@ Set via environment variables (e.g. in a local `.env`, loaded with `export $(gre
 | `AUTH0_AUDIENCE` | yes | The API identifier configured in Auth0 |
 | `ANTHROPIC_CLIENT_TIMEOUT` | no | Go duration string (e.g. `90s`) for the upstream HTTP client timeout; defaults to `60s` |
 
-`sift` itself only needs the four variables above to run and validate tokens. The two below are **not used by the server** — they're only needed if you want to generate a test token yourself via the client-credentials grant (see "Getting a test token" below):
+`sift` itself reads the four variables above to run and validate tokens (only the first three are actually required — the timeout has a default). The two below are **not used by the server** — they're only needed if you want to generate a test token yourself via the client-credentials grant (see "Getting a test token" below):
 
 | Variable | Required | Description |
 |---|---|---|
@@ -49,11 +49,19 @@ The server listens on `:9000`.
 Since auth is client-credentials (machine-to-machine), you can fetch a token directly from Auth0 without a browser login flow:
 
 ```bash
-TOKEN=$(curl -s -X POST "https://${AUTH0_DOMAIN}/oauth/token" \
-  -H "content-type: application/json" \
-  -d "{\"client_id\":\"${AUTH0_CLIENT_ID}\",\"client_secret\":\"${AUTH0_CLIENT_SECRET}\",\"audience\":\"${AUTH0_AUDIENCE}\",\"grant_type\":\"client_credentials\"}" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+TOKEN=$(jq -n '{
+    client_id: env.AUTH0_CLIENT_ID,
+    client_secret: env.AUTH0_CLIENT_SECRET,
+    audience: env.AUTH0_AUDIENCE,
+    grant_type: "client_credentials"
+  }' \
+  | curl -s -X POST "https://${AUTH0_DOMAIN}/oauth/token" \
+      -H "content-type: application/json" \
+      --data-binary @- \
+  | jq -r '.access_token')
 ```
+
+(Uses `jq`'s `env` accessor and `curl --data-binary @-` rather than inlining secrets as literal command-line arguments — arguments passed directly on a command line are visible to other local users via process listings like `ps aux`, whereas this keeps the secret values out of any process's argv. It also avoids manually interpolating untrusted values into a JSON string, which can produce invalid JSON if a value contains a quote or backslash.)
 
 ## 💬 Example request
 
