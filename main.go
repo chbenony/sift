@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -13,6 +14,9 @@ import (
 var (
 	messagesURL = "https://api.anthropic.com/v1/messages"
 )
+
+// maxBodyBytes is 1 MiB, I guess we'll adjust if needed
+const maxBodyBytes = 1 << 20
 
 type AnthropicRequest struct {
 	Model     string    `json:"model,omitempty"`
@@ -53,8 +57,13 @@ func chatHandler(apiKey string, client *http.Client) http.HandlerFunc {
 			return
 		}
 
-		body, err := io.ReadAll(r.Body)
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 		if err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				http.Error(w, "request body is too large", http.StatusRequestEntityTooLarge)
+				return
+			}
 			http.Error(w, "failed to read request body", http.StatusBadRequest)
 			return
 		}
@@ -71,7 +80,7 @@ func chatHandler(apiKey string, client *http.Client) http.HandlerFunc {
 			return
 		}
 
-		req, err := http.NewRequest(http.MethodPost, messagesURL, bytes.NewReader(outBody))
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, messagesURL, bytes.NewReader(outBody))
 		if err != nil {
 			http.Error(w, "failed to build upstream request", http.StatusBadRequest)
 			return
