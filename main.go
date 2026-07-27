@@ -43,7 +43,11 @@ func main() {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	client := &http.Client{Timeout: time.Second * 10}
 
+	// TODO(auth): no inbound authentication yet — any client that can reach this port
+	// can spend the configured Anthropic API key. Tracked for the identity/policy milestone.
 	http.Handle("/", http.HandlerFunc(chatHandler(apiKey, client)))
+	// TODO(hardening): no ReadHeaderTimeout/ReadTimeout configured, so a slow client can
+	// hold a connection open indefinitely. Deferred until this is past scaffolding.
 	err := http.ListenAndServe(":9000", nil)
 	if err != nil {
 		log.Fatalf("error")
@@ -68,6 +72,9 @@ func chatHandler(apiKey string, client *http.Client) http.HandlerFunc {
 			return
 		}
 
+		// TODO(fidelity): decoding into AnthropicRequest and re-marshalling silently drops
+		// fields not modeled here (system, tools, temperature, stream, etc.). Mirror the
+		// raw-passthrough approach used for the response, or model the full request contract.
 		var reqData AnthropicRequest
 		if err := json.Unmarshal(body, &reqData); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
