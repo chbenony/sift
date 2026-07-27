@@ -13,6 +13,10 @@ type StripeReporter struct {
 }
 
 func NewStripeReporter(apiKey string) (*StripeReporter, error) {
+	if apiKey == "" {
+		return nil, fmt.Errorf("stripe api key must not be empty")
+	}
+
 	sc := stripe.NewClient(apiKey)
 	return &StripeReporter{
 		client: sc,

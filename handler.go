@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -25,6 +26,7 @@ type AnthropicRequest struct {
 	Model     string    `json:"model,omitempty"`
 	MaxTokens int64     `json:"max_tokens,omitempty"`
 	Messages  []Message `json:"messages"`
+	Stream    bool      `json:"stream,omitempty"`
 }
 
 type Message struct {
@@ -68,6 +70,11 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter) 
 		var reqData AnthropicRequest
 		if err := json.Unmarshal(body, &reqData); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		if reqData.Stream {
+			http.Error(w, "streaming responses are not supported", http.StatusBadRequest)
 			return
 		}
 
@@ -122,7 +129,7 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter) 
 			log.Printf("error writing response to caller: %v", err)
 		}
 
-		err = reporter.RecordUsage(r.Context(), claims.StripeCustomerID,
+		err = reporter.RecordUsage(context.WithoutCancel(r.Context()), claims.StripeCustomerID,
 			anthropicResp.Usage.InputTokens, anthropicResp.Usage.OutputTokens)
 		if err != nil {
 			log.Printf("failed to get user's record usage: %v", err)
