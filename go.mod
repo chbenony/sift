@@ -3,7 +3,11 @@ module sift
 go 1.26.5
 
 require (
-	github.com/auth0/go-jwt-middleware/v3 v3.2.0 // indirect
+	github.com/auth0/go-jwt-middleware/v3 v3.2.0
+	github.com/stripe/stripe-go/v86 v86.1.1
+)
+
+require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/lestrrat-go/blackmagic v1.0.4 // indirect
