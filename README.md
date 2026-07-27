@@ -28,6 +28,13 @@ Set via environment variables (e.g. in a local `.env`, loaded with `export $(gre
 | `AUTH0_AUDIENCE` | yes | The API identifier configured in Auth0 |
 | `ANTHROPIC_CLIENT_TIMEOUT` | no | Go duration string (e.g. `90s`) for the upstream HTTP client timeout; defaults to `60s` |
 
+`sift` itself only needs the four variables above to run and validate tokens. The two below are **not used by the server** — they're only needed if you want to generate a test token yourself via the client-credentials grant (see "Getting a test token" below):
+
+| Variable | Required | Description |
+|---|---|---|
+| `AUTH0_CLIENT_ID` | only for generating test tokens | Client ID of an Auth0 Machine-to-Machine application authorized against your API |
+| `AUTH0_CLIENT_SECRET` | only for generating test tokens | Corresponding client secret |
+
 ## Running locally
 
 ```bash
