@@ -51,6 +51,7 @@ The server listens on `:9000`.
 Since auth is client-credentials (machine-to-machine), you can fetch a token directly from Auth0 without a browser login flow:
 
 ```bash
+set -o pipefail
 TOKEN=$(jq -n '{
     client_id: env.AUTH0_CLIENT_ID,
     client_secret: env.AUTH0_CLIENT_SECRET,
@@ -63,7 +64,7 @@ TOKEN=$(jq -n '{
   | jq -er '.access_token')
 ```
 
-(Uses `jq`'s `env` accessor and `curl --data-binary @-` rather than inlining secrets as literal command-line arguments — arguments passed directly on a command line are visible to other local users via process listings like `ps aux`, whereas this keeps the secret values out of any process's argv. It also avoids manually interpolating untrusted values into a JSON string, which can produce invalid JSON if a value contains a quote or backslash. `curl --fail-with-body` and `jq -e` make this command fail loudly — instead of silently setting `TOKEN` to the string `null` — if Auth0 returns an error instead of a token, e.g. if the client isn't authorized for the API.)
+(Uses `jq`'s `env` accessor and `curl --data-binary @-` rather than inlining secrets as literal command-line arguments — arguments passed directly on a command line are visible to other local users via process listings like `ps aux`, whereas this keeps the secret values out of any process's argv. It also avoids manually interpolating untrusted values into a JSON string, which can produce invalid JSON if a value contains a quote or backslash. `curl --fail-with-body` and `jq -e` make this command fail loudly — instead of silently setting `TOKEN` to the string `null` — if Auth0 returns an error instead of a token, e.g. if the client isn't authorized for the API. `set -o pipefail` ensures the overall exit status reflects a failure anywhere in the pipeline — e.g. a network/TLS failure in `curl` — rather than only the last command's status.)
 
 ## 💬 Example request
 
