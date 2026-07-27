@@ -1,11 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"time"
+)
+
+var (
+	messagesURL = "https://api.anthropic.com/v1/messages"
 )
 
 type AnthropicRequest struct {
@@ -45,6 +51,64 @@ func chatHandler(apiKey string, client *http.Client) http.HandlerFunc {
 		if apiKey == "" {
 			http.Error(w, "server is misconfigured", http.StatusInternalServerError)
 			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "failed to read request body", http.StatusBadRequest)
+			return
+		}
+
+		var reqData AnthropicRequest
+		if err := json.Unmarshal(body, &reqData); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		outBody, err := json.Marshal(reqData)
+		if err != nil {
+			http.Error(w, "failed to build upstream request", http.StatusInternalServerError)
+			return
+		}
+
+		req, err := http.NewRequest(http.MethodPost, messagesURL, bytes.NewReader(outBody))
+		if err != nil {
+			http.Error(w, "failed to build upstream request", http.StatusBadRequest)
+			return
+		}
+
+		req.Header.Set("x-api-key", apiKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+		req.Header.Set("content-type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			http.Error(w, "upstream request failed", http.StatusBadGateway)
+			return
+		}
+
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				log.Printf("error closing response body %v", err)
+			}
+		}()
+
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			http.Error(w, "failed to read upstream response", http.StatusBadGateway)
+			return
+		}
+
+		var anthropicResp AnthropicResponse
+		if err := json.Unmarshal(respBody, &anthropicResp); err != nil {
+			log.Printf("failed to parse response body for logging: %v", err)
+		}
+		log.Printf("stop_reason=%s", anthropicResp.StopReason)
+
+		w.Header().Set("content-type", "application/json")
+		w.WriteHeader(resp.StatusCode)
+		if _, err := w.Write(respBody); err != nil {
+			log.Printf("error writing response to caller: %v", err)
 		}
 
 	}
