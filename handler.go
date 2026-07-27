@@ -54,22 +54,13 @@ func chatHandler(apiKey string, client *http.Client) http.HandlerFunc {
 			return
 		}
 
-		// TODO(fidelity): decoding into AnthropicRequest and re-marshalling silently drops
-		// fields not modeled here (system, tools, temperature, stream, etc.). Mirror the
-		// raw-passthrough approach used for the response, or model the full request contract.
 		var reqData AnthropicRequest
 		if err := json.Unmarshal(body, &reqData); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
 		}
 
-		outBody, err := json.Marshal(reqData)
-		if err != nil {
-			http.Error(w, "failed to build upstream request", http.StatusInternalServerError)
-			return
-		}
-
-		req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, messagesURL, bytes.NewReader(outBody))
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, messagesURL, bytes.NewReader(body))
 		if err != nil {
 			http.Error(w, "failed to build upstream request", http.StatusBadRequest)
 			return
