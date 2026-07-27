@@ -11,7 +11,7 @@ An identity-aware gateway in front of Anthropic's Claude API. `sift` authenticat
 
 ## 📋 Requirements
 
-- Go 1.26+
+- Go 1.26.5+ (matches the `go` directive in `go.mod`)
 - An [Anthropic API key](https://platform.claude.com/settings/keys)
 - An Auth0 tenant with:
   - A custom API defined (this becomes the token audience)
