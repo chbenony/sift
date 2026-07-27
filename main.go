@@ -63,8 +63,7 @@ func chatHandler(apiKey string, client *http.Client) http.HandlerFunc {
 
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 		if err != nil {
-			var maxBytesErr *http.MaxBytesError
-			if errors.As(err, &maxBytesErr) {
+			if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
 				http.Error(w, "request body is too large", http.StatusRequestEntityTooLarge)
 				return
 			}
