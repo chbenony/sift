@@ -19,7 +19,7 @@ An identity-aware gateway in front of Anthropic's Claude API. `sift` authenticat
 
 ## 🔐 Configuration
 
-Set via environment variables (e.g. in a local `.env`, loaded with `export $(grep -v '^#' .env | xargs)`):
+Set via environment variables (e.g. in a local `.env`, loaded with `set -a; source .env; set +a`):
 
 | Variable | Required | Description |
 |---|---|---|
@@ -38,9 +38,11 @@ Set via environment variables (e.g. in a local `.env`, loaded with `export $(gre
 ## 🚀 Running locally
 
 ```bash
-export $(grep -v '^#' .env | xargs)
+set -a; source .env; set +a
 go run main.go handler.go
 ```
+
+(`source`ing the file directly avoids spawning any intermediate process with secret values in its argv — unlike `export $(... | xargs)`, which passes every value through `xargs`' own command-line arguments and can also mangle values containing spaces or quotes.)
 
 The server listens on `:9000`.
 
