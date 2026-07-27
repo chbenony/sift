@@ -57,13 +57,13 @@ TOKEN=$(jq -n '{
     audience: env.AUTH0_AUDIENCE,
     grant_type: "client_credentials"
   }' \
-  | curl -s -X POST "https://${AUTH0_DOMAIN}/oauth/token" \
+  | curl -s --fail-with-body -X POST "https://${AUTH0_DOMAIN}/oauth/token" \
       -H "content-type: application/json" \
       --data-binary @- \
-  | jq -r '.access_token')
+  | jq -er '.access_token')
 ```
 
-(Uses `jq`'s `env` accessor and `curl --data-binary @-` rather than inlining secrets as literal command-line arguments — arguments passed directly on a command line are visible to other local users via process listings like `ps aux`, whereas this keeps the secret values out of any process's argv. It also avoids manually interpolating untrusted values into a JSON string, which can produce invalid JSON if a value contains a quote or backslash.)
+(Uses `jq`'s `env` accessor and `curl --data-binary @-` rather than inlining secrets as literal command-line arguments — arguments passed directly on a command line are visible to other local users via process listings like `ps aux`, whereas this keeps the secret values out of any process's argv. It also avoids manually interpolating untrusted values into a JSON string, which can produce invalid JSON if a value contains a quote or backslash. `curl --fail-with-body` and `jq -e` make this command fail loudly — instead of silently setting `TOKEN` to the string `null` — if Auth0 returns an error instead of a token, e.g. if the client isn't authorized for the API.)
 
 ## 💬 Example request
 
