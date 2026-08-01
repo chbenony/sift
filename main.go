@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"sift/internal/auth"
 	"sift/internal/billing"
+	"sync"
+	"syscall"
 	"time"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
@@ -19,6 +24,9 @@ func main() {
 
 	// Stripe env variables
 	stripeApiKey := os.Getenv("STRIPE_API_KEY")
+
+	//wait group
+	var wg sync.WaitGroup
 
 	timeout := 60 * time.Second
 	if v := os.Getenv("ANTHROPIC_CLIENT_TIMEOUT"); v != "" {
@@ -43,11 +51,26 @@ func main() {
 		log.Fatalf("failed to create middleware: %v", err)
 	}
 
-	http.Handle("/", middleware.CheckJWT(http.HandlerFunc(chatHandler(apiKey, client, reporter))))
+	http.Handle("/", middleware.CheckJWT(http.HandlerFunc(chatHandler(apiKey, client, reporter, &wg))))
 	// TODO(hardening): no ReadHeaderTimeout/ReadTimeout configured, so a slow client can
 	// hold a connection open indefinitely. Deferred until this is past scaffolding.
-	err = http.ListenAndServe(":9000", nil)
-	if err != nil {
-		log.Fatalf("error")
+	srv := &http.Server{Addr: ":9000"}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("server error: %v", err)
+		}
+	}()
+	<-ctx.Done() //main blocks here until SIGINT/SIGTERM
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown error: %v", err)
 	}
+	wg.Wait()
 }

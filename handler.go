@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"sift/internal/auth"
 	"sift/internal/billing"
+	"sync"
 	"time"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
@@ -52,7 +53,7 @@ type Usage struct {
 	OutputTokens int64 `json:"output_tokens"`
 }
 
-func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter) http.HandlerFunc {
+func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter, wg *sync.WaitGroup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if apiKey == "" {
 			http.Error(w, "server is misconfigured", http.StatusInternalServerError)
@@ -133,7 +134,7 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter) 
 		}
 
 		if unmarshalErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			go func() {
+			wg.Go(func() {
 				ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
 				defer cancel()
 
@@ -141,7 +142,7 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter) 
 					anthropicResp.Usage.InputTokens, anthropicResp.Usage.OutputTokens); err != nil {
 					log.Printf("failed to get user's record usage: %v", err)
 				}
-			}()
+			})
 		}
 
 	}
