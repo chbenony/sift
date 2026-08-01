@@ -133,7 +133,7 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter, 
 			log.Printf("error writing response to caller: %v", err)
 		}
 
-		if unmarshalErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		if unmarshalErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 && anthropicResp.ID != "" {
 			wg.Go(func() {
 				ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
 				defer cancel()
