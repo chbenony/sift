@@ -41,6 +41,7 @@ type Content struct {
 }
 
 type AnthropicResponse struct {
+	ID         string    `json:"id"`
 	Content    []Content `json:"content"`
 	StopReason string    `json:"stop_reason"`
 	Usage      Usage     `json:"usage"`
@@ -133,7 +134,7 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter) 
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
 		defer cancel()
 
-		err = reporter.RecordUsage(ctx, claims.StripeCustomerID,
+		err = reporter.RecordUsage(ctx, anthropicResp.ID, claims.StripeCustomerID,
 			anthropicResp.Usage.InputTokens, anthropicResp.Usage.OutputTokens)
 		if err != nil {
 			log.Printf("failed to get user's record usage: %v", err)

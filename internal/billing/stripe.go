@@ -2,6 +2,7 @@ package billing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -23,7 +24,7 @@ func NewStripeReporter(apiKey string) (*StripeReporter, error) {
 	}, nil
 }
 
-func (sp *StripeReporter) RecordUsage(ctx context.Context, customerID string, inputTokens, outputTokens int64) error {
+func (sp *StripeReporter) RecordUsage(ctx context.Context, messageID string, customerID string, inputTokens, outputTokens int64) error {
 
 	events := []struct {
 		eventName string
@@ -33,18 +34,21 @@ func (sp *StripeReporter) RecordUsage(ctx context.Context, customerID string, in
 		{"anthropic_output_tokens", outputTokens},
 	}
 
+	var recordErr error
+
 	for _, e := range events {
 		_, err := sp.client.V1BillingMeterEvents.Create(ctx, &stripe.BillingMeterEventCreateParams{
-			EventName: stripe.String(e.eventName),
+			Identifier: stripe.String(messageID + "-" + e.eventName),
+			EventName:  stripe.String(e.eventName),
 			Payload: map[string]string{
 				"stripe_customer_id": customerID,
 				"value":              strconv.FormatInt(e.value, 10),
 			},
 		})
 		if err != nil {
-			return fmt.Errorf("recording %s usage: %w", e.eventName, err)
+			recordErr = errors.Join(recordErr, err)
 		}
 	}
 
-	return nil
+	return recordErr
 }
