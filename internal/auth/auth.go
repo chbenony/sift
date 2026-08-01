@@ -3,6 +3,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 
@@ -45,5 +46,8 @@ func NewValidator(domain, audience string) (*validator.Validator, error) {
 }
 
 func (c *CustomClaims) Validate(ctx context.Context) error {
+	if c.StripeCustomerID == "" {
+		return errors.New("token missing required stripe_customer_id claim")
+	}
 	return nil
 }
