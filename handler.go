@@ -133,14 +133,15 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter) 
 		}
 
 		if unmarshalErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
-			defer cancel()
+			go func() {
+				ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
+				defer cancel()
 
-			err = reporter.RecordUsage(ctx, anthropicResp.ID, claims.StripeCustomerID,
-				anthropicResp.Usage.InputTokens, anthropicResp.Usage.OutputTokens)
-			if err != nil {
-				log.Printf("failed to get user's record usage: %v", err)
-			}
+				if err := reporter.RecordUsage(ctx, anthropicResp.ID, claims.StripeCustomerID,
+					anthropicResp.Usage.InputTokens, anthropicResp.Usage.OutputTokens); err != nil {
+					log.Printf("failed to get user's record usage: %v", err)
+				}
+			}()
 		}
 
 	}
