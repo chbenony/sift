@@ -55,6 +55,9 @@ type Usage struct {
 
 func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter, wg *sync.WaitGroup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		wg.Add(1)
+		defer wg.Done()
+
 		if apiKey == "" {
 			http.Error(w, "server is misconfigured", http.StatusInternalServerError)
 			return

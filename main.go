@@ -59,18 +59,35 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	serveErr := make(chan error, 1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("server error: %v", err)
+			serveErr <- err
 		}
 	}()
-	<-ctx.Done() //main blocks here until SIGINT/SIGTERM
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("shutdown error: %v", err)
+	select {
+	case err := <-serveErr:
+		log.Fatalf("server error: %v", err)
+	case <-ctx.Done():
+		// proceed with graceful shutdown
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("shutdown error: %v", err)
+		}
 	}
-	wg.Wait()
+
+	waitDone := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(waitDone)
+	}()
+
+	select {
+	case <-waitDone:
+		log.Println("all in-flight work completed")
+	case <-time.After(5 * time.Second):
+		log.Println("timed out waiting for in-flight work; some usage may not have been recorded")
+	}
 }
