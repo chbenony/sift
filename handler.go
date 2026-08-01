@@ -120,8 +120,9 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter) 
 		}
 
 		var anthropicResp AnthropicResponse
-		if err := json.Unmarshal(respBody, &anthropicResp); err != nil {
-			log.Printf("failed to parse response body for logging: %v", err)
+		unmarshalErr := json.Unmarshal(respBody, &anthropicResp)
+		if unmarshalErr != nil {
+			log.Printf("failed to parse response body for logging: %v", unmarshalErr)
 		}
 		log.Printf("stop_reason=%s", anthropicResp.StopReason)
 
@@ -131,13 +132,15 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter) 
 			log.Printf("error writing response to caller: %v", err)
 		}
 
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
-		defer cancel()
+		if unmarshalErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
+			defer cancel()
 
-		err = reporter.RecordUsage(ctx, anthropicResp.ID, claims.StripeCustomerID,
-			anthropicResp.Usage.InputTokens, anthropicResp.Usage.OutputTokens)
-		if err != nil {
-			log.Printf("failed to get user's record usage: %v", err)
+			err = reporter.RecordUsage(ctx, anthropicResp.ID, claims.StripeCustomerID,
+				anthropicResp.Usage.InputTokens, anthropicResp.Usage.OutputTokens)
+			if err != nil {
+				log.Printf("failed to get user's record usage: %v", err)
+			}
 		}
 
 	}
