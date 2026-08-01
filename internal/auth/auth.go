@@ -2,12 +2,18 @@
 package auth
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/url"
 
 	"github.com/auth0/go-jwt-middleware/v3/jwks"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 )
+
+type CustomClaims struct {
+	StripeCustomerID string `json:"https://sift.dev/stripe_customer_id"`
+}
 
 // NewValidator builds a validator that verifies RS256 access tokens issued by
 // the given Auth0 domain (e.g. "your-tenant.us.auth0.com") for the given
@@ -28,10 +34,20 @@ func NewValidator(domain, audience string) (*validator.Validator, error) {
 		validator.WithAlgorithm(validator.RS256),
 		validator.WithIssuer(issuerURL.String()),
 		validator.WithAudience(audience),
+		validator.WithCustomClaims(func() *CustomClaims {
+			return &CustomClaims{}
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create validator: %w", err)
 	}
 
 	return v, nil
+}
+
+func (c *CustomClaims) Validate(ctx context.Context) error {
+	if c.StripeCustomerID == "" {
+		return errors.New("token missing required stripe_customer_id claim")
+	}
+	return nil
 }
