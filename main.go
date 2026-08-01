@@ -16,6 +16,10 @@ import (
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
 )
 
+const (
+	billingTimeout = 10 * time.Second
+)
+
 func main() {
 	// Auth0 env variables
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
@@ -87,7 +91,7 @@ func main() {
 	select {
 	case <-waitDone:
 		log.Println("all in-flight work completed")
-	case <-time.After(5 * time.Second):
+	case <-time.After(billingTimeout):
 		log.Println("timed out waiting for in-flight work; some usage may not have been recorded")
 	}
 }

@@ -11,7 +11,6 @@ import (
 	"sift/internal/auth"
 	"sift/internal/billing"
 	"sync"
-	"time"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
@@ -138,7 +137,7 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter, 
 
 		if unmarshalErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 && anthropicResp.ID != "" {
 			wg.Go(func() {
-				ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
+				ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), billingTimeout)
 				defer cancel()
 
 				if err := reporter.RecordUsage(ctx, anthropicResp.ID, claims.StripeCustomerID,
