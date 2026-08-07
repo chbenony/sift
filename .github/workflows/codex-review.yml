@@ -68,7 +68,7 @@ jobs:
                      pull_number: context.payload.pull_request.number,
                      event: "COMMENT",
                      body: summary,
-                     comments: (comments || []).map(({ path, line, body }) => ({ path, line, body })),
+                     comments: (comments || []).map(({ path, line, body }) => ({ path, line, side: "RIGHT", body })),
                   });
               env:
                 CODEX_FINAL_MESSAGE: ${{ needs.codex.outputs.final_message }}
