@@ -25,13 +25,34 @@ jobs:
               with:
                 openai-api-key: ${{ secrets.OPENAI_API_KEY }}
                 prompt-file: .github/codex/prompts/review.md
-                output-file: codex-output.md
+                output-file: codex-output.json
+                output-schema: |
+                  {
+                    "type": "object",
+                    "properties": {
+                      "summary": { "type": "string" },
+                      "comments": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "path": { "type": "string" },
+                            "line": { "type": "integer" },
+                            "body": { "type": "string" }
+                          },
+                          "required": ["path", "line", "body"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["summary", "comments"],
+                    "additionalProperties": false
+                  }
     post_feedback:
         runs-on: ubuntu-latest
         needs: codex
         if: needs.codex.outputs.final_message != ''
         permissions:
-            issues: write
             pull-requests: write
         steps:
             - name: Post Codex Feedback
@@ -39,11 +60,15 @@ jobs:
               with:
                 github-token: ${{ github.token }}
                 script: |
-                  await github.rest.issues.createComment({
+                  const { summary, comments } = JSON.parse(process.env.CODEX_FINAL_MESSAGE);
+
+                  await github.rest.pulls.createReview({
                      owner: context.repo.owner,
                      repo: context.repo.repo,
-                     issue_number: context.payload.pull_request.number,
-                     body: process.env.CODEX_FINAL_MESSAGE,
+                     pull_number: context.payload.pull_request.number,
+                     event: "COMMENT",
+                     body: summary,
+                     comments: (comments || []).map(({ path, line, body }) => ({ path, line, body })),
                   });
               env:
                 CODEX_FINAL_MESSAGE: ${{ needs.codex.outputs.final_message }}

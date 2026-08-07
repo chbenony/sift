@@ -10,4 +10,6 @@ Do not comment on:
 - Formatting or style that a linter would catch
 - Personal preference where the existing code is already reasonable
 
-Keep the review concise. If the change looks good, say so briefly instead of inventing nitpicks. For each issue found, reference the specific file and line, explain the concrete problem, and suggest a fix.
+Keep the review concise. If the change looks good, say so briefly instead of inventing nitpicks.
+
+Report each issue as a separate entry in `comments`, anchored to the specific file and line it applies to (use the line number in the new/right-hand version of the file, and only lines that are actually part of the diff). Each comment body should explain the concrete problem and suggest a fix. Use `summary` for a short overall verdict (1-3 sentences) — do not repeat the per-line issues there. If there are no issues, return an empty `comments` array and say so in `summary`.
