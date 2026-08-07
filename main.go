@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sift/internal/anthropic"
 	"sift/internal/auth"
 	"sift/internal/billing"
 	"sync"
@@ -39,6 +40,10 @@ func main() {
 		}
 	}
 	client := &http.Client{Timeout: timeout}
+	anthropicClient, err := anthropic.NewClient(apiKey, client)
+	if err != nil {
+		log.Fatalf("failed to create new anthropic client: %v", err)
+	}
 
 	jwtValidator, err := auth.NewValidator(domain, audience)
 	if err != nil {
@@ -55,7 +60,7 @@ func main() {
 		log.Fatalf("failed to create middleware: %v", err)
 	}
 
-	http.Handle("/", middleware.CheckJWT(http.HandlerFunc(chatHandler(apiKey, client, reporter, &wg))))
+	http.Handle("/", middleware.CheckJWT(http.HandlerFunc(chatHandler(anthropicClient, reporter, &wg))))
 	// TODO(hardening): no ReadHeaderTimeout/ReadTimeout configured, so a slow client can
 	// hold a connection open indefinitely. Deferred until this is past scaffolding.
 	srv := &http.Server{Addr: ":9000"}

@@ -1,13 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
 	"net/http"
+	"sift/internal/anthropic"
 	"sift/internal/auth"
 	"sift/internal/billing"
 	"sync"
@@ -23,44 +23,10 @@ var (
 // maxBodyBytes is 1 MiB, I guess we'll adjust if needed
 const maxBodyBytes = 1 << 20
 
-type AnthropicRequest struct {
-	Model     string    `json:"model,omitempty"`
-	MaxTokens int64     `json:"max_tokens,omitempty"`
-	Messages  []Message `json:"messages"`
-	Stream    bool      `json:"stream,omitempty"`
-}
-
-type Message struct {
-	Role    string          `json:"role"`
-	Content json.RawMessage `json:"content"`
-}
-
-type Content struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
-}
-
-type AnthropicResponse struct {
-	ID         string    `json:"id"`
-	Content    []Content `json:"content"`
-	StopReason string    `json:"stop_reason"`
-	Usage      Usage     `json:"usage"`
-}
-
-type Usage struct {
-	InputTokens  int64 `json:"input_tokens"`
-	OutputTokens int64 `json:"output_tokens"`
-}
-
-func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter, wg *sync.WaitGroup) http.HandlerFunc {
+func chatHandler(anthropicClient *anthropic.Client, reporter billing.Reporter, wg *sync.WaitGroup) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		defer wg.Done()
-
-		if apiKey == "" {
-			http.Error(w, "server is misconfigured", http.StatusInternalServerError)
-			return
-		}
 
 		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 		if err != nil {
@@ -72,7 +38,7 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter, 
 			return
 		}
 
-		var reqData AnthropicRequest
+		var reqData anthropic.Request
 		if err := json.Unmarshal(body, &reqData); err != nil {
 			http.Error(w, "invalid request body", http.StatusBadRequest)
 			return
@@ -80,12 +46,6 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter, 
 
 		if reqData.Stream {
 			http.Error(w, "streaming responses are not supported", http.StatusBadRequest)
-			return
-		}
-
-		req, err := http.NewRequestWithContext(r.Context(), http.MethodPost, messagesURL, bytes.NewReader(body))
-		if err != nil {
-			http.Error(w, "failed to build upstream request", http.StatusBadRequest)
 			return
 		}
 
@@ -100,48 +60,29 @@ func chatHandler(apiKey string, client *http.Client, reporter billing.Reporter, 
 			return
 		}
 
-		req.Header.Set("x-api-key", apiKey)
-		req.Header.Set("anthropic-version", "2023-06-01")
-		req.Header.Set("content-type", "application/json")
-
-		resp, err := client.Do(req)
+		result, err := anthropicClient.Send(r.Context(), body)
 		if err != nil {
 			http.Error(w, "upstream request failed", http.StatusBadGateway)
 			return
 		}
-
-		defer func() {
-			if err := resp.Body.Close(); err != nil {
-				log.Printf("error closing response body %v", err)
-			}
-		}()
-
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			http.Error(w, "failed to read upstream response", http.StatusBadGateway)
-			return
+		if result.ParseErr != nil {
+			log.Printf("failed to parse response body for logging: %v", result.ParseErr)
 		}
-
-		var anthropicResp AnthropicResponse
-		unmarshalErr := json.Unmarshal(respBody, &anthropicResp)
-		if unmarshalErr != nil {
-			log.Printf("failed to parse response body for logging: %v", unmarshalErr)
-		}
-		log.Printf("stop_reason=%s", anthropicResp.StopReason)
+		log.Printf("stop_reason=%s", result.Parsed.StopReason)
 
 		w.Header().Set("content-type", "application/json")
-		w.WriteHeader(resp.StatusCode)
-		if _, err := w.Write(respBody); err != nil {
+		w.WriteHeader(result.StatusCode)
+		if _, err := w.Write(result.Body); err != nil {
 			log.Printf("error writing response to caller: %v", err)
 		}
 
-		if unmarshalErr == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 && anthropicResp.ID != "" {
+		if result.ParseErr == nil && result.StatusCode >= 200 && result.StatusCode < 300 && result.Parsed.ID != "" {
 			wg.Go(func() {
 				ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), billingTimeout)
 				defer cancel()
 
-				if err := reporter.RecordUsage(ctx, anthropicResp.ID, claims.StripeCustomerID,
-					anthropicResp.Usage.InputTokens, anthropicResp.Usage.OutputTokens); err != nil {
+				if err := reporter.RecordUsage(ctx, result.Parsed.ID, claims.StripeCustomerID,
+					result.Parsed.Usage.InputTokens, result.Parsed.Usage.OutputTokens); err != nil {
 					log.Printf("failed to get user's record usage: %v", err)
 				}
 			})
