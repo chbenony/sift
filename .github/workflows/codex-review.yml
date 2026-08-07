@@ -25,7 +25,29 @@ jobs:
               with:
                 openai-api-key: ${{ secrets.OPENAI_API_KEY }}
                 prompt-file: .github/codex/prompts/review.md
-                output-file: codex-output.md
+                output-file: codex-output.json
+                output-schema: |
+                  {
+                    "type": "object",
+                    "properties": {
+                      "summary": { "type": "string" },
+                      "comments": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "path": { "type": "string" },
+                            "line": { "type": "integer" },
+                            "body": { "type": "string" }
+                          },
+                          "required": ["path", "line", "body"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["summary", "comments"],
+                    "additionalProperties": false
+                  }
     post_feedback:
         runs-on: ubuntu-latest
         needs: codex
@@ -39,11 +61,36 @@ jobs:
               with:
                 github-token: ${{ github.token }}
                 script: |
-                  await github.rest.issues.createComment({
-                     owner: context.repo.owner,
-                     repo: context.repo.repo,
-                     issue_number: context.payload.pull_request.number,
-                     body: process.env.CODEX_FINAL_MESSAGE,
-                  });
+                  const { summary, comments } = JSON.parse(process.env.CODEX_FINAL_MESSAGE);
+                  const reviewComments = (comments || []).map(({ path, line, body }) => ({ path, line, side: "RIGHT", body }));
+
+                  try {
+                    await github.rest.pulls.createReview({
+                       owner: context.repo.owner,
+                       repo: context.repo.repo,
+                       pull_number: context.payload.pull_request.number,
+                       event: "COMMENT",
+                       body: summary,
+                       comments: reviewComments,
+                    });
+                  } catch (err) {
+                    // A single bad path/line anchor from the model 422s the whole review,
+                    // dropping the summary and every other comment along with it.
+                    core.warning(`createReview failed (${err.message}); falling back to a plain comment.`);
+                    const fallbackBody = [
+                      summary,
+                      "",
+                      "_Inline comments could not be posted, listed here unanchored:_",
+                      "",
+                      ...reviewComments.map((c) => `- **${c.path}:${c.line}** — ${c.body}`),
+                    ].join("\n");
+
+                    await github.rest.issues.createComment({
+                       owner: context.repo.owner,
+                       repo: context.repo.repo,
+                       issue_number: context.payload.pull_request.number,
+                       body: fallbackBody,
+                    });
+                  }
               env:
                 CODEX_FINAL_MESSAGE: ${{ needs.codex.outputs.final_message }}
