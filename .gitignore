@@ -1,3 +1,4 @@
 .claude
 /sift
 .env
+.DS_Store
