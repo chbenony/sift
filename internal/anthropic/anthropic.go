@@ -14,9 +14,6 @@ var (
 	messagesURL = "https://api.anthropic.com/v1/messages"
 )
 
-// maxBodyBytes is 1 MiB, I guess we'll adjust if needed
-const maxBodyBytes = 1 << 20
-
 type Request struct {
 	Model     string    `json:"model,omitempty"`
 	MaxTokens int64     `json:"max_tokens,omitempty"`

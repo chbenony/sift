@@ -16,10 +16,6 @@ import (
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 )
 
-var (
-	messagesURL = "https://api.anthropic.com/v1/messages"
-)
-
 // maxBodyBytes is 1 MiB, I guess we'll adjust if needed
 const maxBodyBytes = 1 << 20
 
