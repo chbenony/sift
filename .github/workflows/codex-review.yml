@@ -53,6 +53,7 @@ jobs:
         needs: codex
         if: needs.codex.outputs.final_message != ''
         permissions:
+            issues: write
             pull-requests: write
         steps:
             - name: Post Codex Feedback
@@ -61,14 +62,35 @@ jobs:
                 github-token: ${{ github.token }}
                 script: |
                   const { summary, comments } = JSON.parse(process.env.CODEX_FINAL_MESSAGE);
+                  const reviewComments = (comments || []).map(({ path, line, body }) => ({ path, line, side: "RIGHT", body }));
 
-                  await github.rest.pulls.createReview({
-                     owner: context.repo.owner,
-                     repo: context.repo.repo,
-                     pull_number: context.payload.pull_request.number,
-                     event: "COMMENT",
-                     body: summary,
-                     comments: (comments || []).map(({ path, line, body }) => ({ path, line, side: "RIGHT", body })),
-                  });
+                  try {
+                    await github.rest.pulls.createReview({
+                       owner: context.repo.owner,
+                       repo: context.repo.repo,
+                       pull_number: context.payload.pull_request.number,
+                       event: "COMMENT",
+                       body: summary,
+                       comments: reviewComments,
+                    });
+                  } catch (err) {
+                    // A single bad path/line anchor from the model 422s the whole review,
+                    // dropping the summary and every other comment along with it.
+                    core.warning(`createReview failed (${err.message}); falling back to a plain comment.`);
+                    const fallbackBody = [
+                      summary,
+                      "",
+                      "_Inline comments could not be posted, listed here unanchored:_",
+                      "",
+                      ...reviewComments.map((c) => `- **${c.path}:${c.line}** — ${c.body}`),
+                    ].join("\n");
+
+                    await github.rest.issues.createComment({
+                       owner: context.repo.owner,
+                       repo: context.repo.repo,
+                       issue_number: context.payload.pull_request.number,
+                       body: fallbackBody,
+                    });
+                  }
               env:
                 CODEX_FINAL_MESSAGE: ${{ needs.codex.outputs.final_message }}
