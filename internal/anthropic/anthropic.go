@@ -62,6 +62,9 @@ func NewClient(apiKey string, httpClient *http.Client) (*Client, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("anthropic api key must not be empty")
 	}
+	if httpClient == nil {
+		return nil, fmt.Errorf("httpClient must not be nil")
+	}
 	return &Client{
 		apiKey:     apiKey,
 		httpClient: httpClient,
