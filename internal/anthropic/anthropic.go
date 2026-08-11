@@ -45,6 +45,7 @@ type Usage struct {
 
 type Client struct {
 	apiKey     string
+	BaseURL    string
 	httpClient *http.Client
 }
 
@@ -64,12 +65,13 @@ func NewClient(apiKey string, httpClient *http.Client) (*Client, error) {
 	}
 	return &Client{
 		apiKey:     apiKey,
+		BaseURL:    messagesURL,
 		httpClient: httpClient,
 	}, nil
 }
 
 func (c *Client) Send(ctx context.Context, body []byte) (*Result, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, messagesURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
