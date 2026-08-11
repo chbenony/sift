@@ -4,7 +4,9 @@ go 1.26.5
 
 require (
 	github.com/auth0/go-jwt-middleware/v3 v3.2.0
+	github.com/google/uuid v1.6.0
 	github.com/stripe/stripe-go/v86 v86.1.1
+	go.uber.org/mock v0.6.0
 )
 
 require (
