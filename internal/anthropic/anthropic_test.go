@@ -62,7 +62,7 @@ func Test_Anthropic(t *testing.T) {
 
 			result, err := client.Send(context.Background(), []byte("{}"))
 			if err != nil {
-				t.Errorf("ParseErr = %v, wantParseErr = %v", result.ParseErr, tt.wantParseErr)
+				t.Fatalf("Send() error: %v", err)
 			}
 
 			gotParseErr := result.ParseErr != nil
