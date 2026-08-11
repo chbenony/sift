@@ -1,3 +1,4 @@
+//go:generate mockgen -source=stripe.go -destination=stripe_mock_test.go -package=billing
 package billing
 
 import (
@@ -9,8 +10,12 @@ import (
 	"github.com/stripe/stripe-go/v86"
 )
 
+type meterEventCreator interface {
+	Create(ctx context.Context, params *stripe.BillingMeterEventCreateParams) (*stripe.BillingMeterEvent, error)
+}
+
 type StripeReporter struct {
-	client *stripe.Client
+	meterEvents meterEventCreator
 }
 
 func NewStripeReporter(apiKey string) (*StripeReporter, error) {
@@ -20,7 +25,7 @@ func NewStripeReporter(apiKey string) (*StripeReporter, error) {
 
 	sc := stripe.NewClient(apiKey)
 	return &StripeReporter{
-		client: sc,
+		meterEvents: sc.V1BillingMeterEvents,
 	}, nil
 }
 
@@ -37,7 +42,7 @@ func (sp *StripeReporter) RecordUsage(ctx context.Context, messageID string, cus
 	var recordErr error
 
 	for _, e := range events {
-		_, err := sp.client.V1BillingMeterEvents.Create(ctx, &stripe.BillingMeterEventCreateParams{
+		_, err := sp.meterEvents.Create(ctx, &stripe.BillingMeterEventCreateParams{
 			Identifier: stripe.String(messageID + "-" + e.eventName),
 			EventName:  stripe.String(e.eventName),
 			Payload: map[string]string{
