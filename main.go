@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sift/graph"
 	"sift/internal/anthropic"
 	"sift/internal/auth"
 	"sift/internal/billing"
@@ -14,12 +15,27 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/lru"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
+	"github.com/vektah/gqlparser/v2/ast"
 )
 
 const (
 	billingTimeout = 10 * time.Second
+	// aliasing a field (e.g. a: usage{...} b: usage{...} ...) multiplies
+	// resolver calls per request, so cap total query complexity.
+	maxQueryComplexity = 100
 )
+
+func limitBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+		next.ServeHTTP(w, r)
+	})
+}
 
 func main() {
 	// Auth0 env variables
@@ -29,6 +45,8 @@ func main() {
 
 	// Stripe env variables
 	stripeApiKey := os.Getenv("STRIPE_API_KEY")
+	stripeTokensInputMeterId := os.Getenv("STRIPE_INPUT_TOKENS_METER_ID")
+	stripeTokensOutputMeterId := os.Getenv("STRIPE_OUTPUT_TOKENS_METER_ID")
 
 	//wait group
 	var wg sync.WaitGroup
@@ -50,7 +68,7 @@ func main() {
 		log.Fatalf("failed to create validator: %v", err)
 	}
 
-	reporter, err := billing.NewStripeReporter(stripeApiKey)
+	reporter, err := billing.NewStripeReporter(stripeApiKey, stripeTokensInputMeterId, stripeTokensOutputMeterId)
 	if err != nil {
 		log.Fatalf("failed to create new stripe reporter: %v", err)
 	}
@@ -59,6 +77,23 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create middleware: %v", err)
 	}
+
+	resolver := graph.NewResolver(anthropicClient, reporter, reporter, &wg)
+	graphqlHandler := handler.New(graph.NewExecutableSchema(graph.Config{
+		Resolvers: resolver,
+	}))
+	// Built explicitly instead of handler.NewDefaultServer: this schema has no
+	// subscriptions, and CheckJWT only validates the initial HTTP upgrade, so a
+	// WebSocket transport would let a connection outlive its JWT.
+	graphqlHandler.AddTransport(transport.Options{})
+	graphqlHandler.AddTransport(transport.GET{})
+	graphqlHandler.AddTransport(transport.POST{})
+	graphqlHandler.AddTransport(transport.MultipartForm{})
+	graphqlHandler.SetQueryCache(lru.New[*ast.QueryDocument](1000))
+	graphqlHandler.Use(extension.Introspection{})
+	graphqlHandler.Use(extension.AutomaticPersistedQuery{Cache: lru.New[string](100)})
+	graphqlHandler.Use(extension.FixedComplexityLimit(maxQueryComplexity))
+	http.Handle("/graphql", middleware.CheckJWT(limitBody(graphqlHandler)))
 
 	http.Handle("/", middleware.CheckJWT(http.HandlerFunc(chatHandler(anthropicClient, reporter, &wg))))
 	// TODO(hardening): no ReadHeaderTimeout/ReadTimeout configured, so a slow client can

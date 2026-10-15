@@ -1,0 +1,26 @@
+scalar Int64
+
+type Usage {
+  inputTokens: Int64!
+  outputTokens: Int64!
+}
+
+type Message {
+  id: ID!
+  content: String!
+  stopReason: String!
+  usage: Usage!
+}
+
+input SendMessageInput {
+  model: String!
+  content: String!
+}
+
+type Query {
+  usage: Usage!
+}
+
+type Mutation {
+  sendMessage(input: SendMessageInput!): Message!
+}
