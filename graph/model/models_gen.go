@@ -21,6 +21,6 @@ type SendMessageInput struct {
 }
 
 type Usage struct {
-	InputTokens  int32 `json:"inputTokens"`
-	OutputTokens int32 `json:"outputTokens"`
+	InputTokens  int64 `json:"inputTokens"`
+	OutputTokens int64 `json:"outputTokens"`
 }

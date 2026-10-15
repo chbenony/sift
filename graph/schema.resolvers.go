@@ -19,14 +19,11 @@ import (
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 )
 
-// Stripe rejects start_time=0, so any minute-aligned time before the meters
-// existed stands in for "all time"
-var usageStart = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
-
-const billingTimeout = 10 * time.Second
-
 // SendMessage is the resolver for the sendMessage field.
 func (r *mutationResolver) SendMessage(ctx context.Context, input model.SendMessageInput) (*model.Message, error) {
+	r.wg.Add(1)
+	defer r.wg.Done()
+
 	contentBytes, err := json.Marshal(input.Content)
 	if err != nil {
 		return nil, err
@@ -90,8 +87,8 @@ func (r *mutationResolver) SendMessage(ctx context.Context, input model.SendMess
 		Content:    text,
 		StopReason: result.Parsed.StopReason,
 		Usage: &model.Usage{
-			InputTokens:  int32(result.Parsed.Usage.InputTokens),
-			OutputTokens: int32(result.Parsed.Usage.OutputTokens),
+			InputTokens:  result.Parsed.Usage.InputTokens,
+			OutputTokens: result.Parsed.Usage.OutputTokens,
 		},
 	}, nil
 }
@@ -115,8 +112,8 @@ func (r *queryResolver) Usage(ctx context.Context) (*model.Usage, error) {
 	}
 
 	return &model.Usage{
-		InputTokens:  int32(input),
-		OutputTokens: int32(output),
+		InputTokens:  input,
+		OutputTokens: output,
 	}, nil
 }
 

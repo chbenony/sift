@@ -1,6 +1,8 @@
+scalar Int64
+
 type Usage {
-  inputTokens: Int!
-  outputTokens: Int!
+  inputTokens: Int64!
+  outputTokens: Int64!
 }
 
 type Message {
