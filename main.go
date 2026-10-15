@@ -17,7 +17,10 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/lru"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
+	"github.com/vektah/gqlparser/v2/ast"
 )
 
 const (
@@ -76,9 +79,19 @@ func main() {
 	}
 
 	resolver := graph.NewResolver(anthropicClient, reporter, reporter, &wg)
-	graphqlHandler := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
+	graphqlHandler := handler.New(graph.NewExecutableSchema(graph.Config{
 		Resolvers: resolver,
 	}))
+	// Built explicitly instead of handler.NewDefaultServer: this schema has no
+	// subscriptions, and CheckJWT only validates the initial HTTP upgrade, so a
+	// WebSocket transport would let a connection outlive its JWT.
+	graphqlHandler.AddTransport(transport.Options{})
+	graphqlHandler.AddTransport(transport.GET{})
+	graphqlHandler.AddTransport(transport.POST{})
+	graphqlHandler.AddTransport(transport.MultipartForm{})
+	graphqlHandler.SetQueryCache(lru.New[*ast.QueryDocument](1000))
+	graphqlHandler.Use(extension.Introspection{})
+	graphqlHandler.Use(extension.AutomaticPersistedQuery{Cache: lru.New[string](100)})
 	graphqlHandler.Use(extension.FixedComplexityLimit(maxQueryComplexity))
 	http.Handle("/graphql", middleware.CheckJWT(limitBody(graphqlHandler)))
 
