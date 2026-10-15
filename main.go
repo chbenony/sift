@@ -16,11 +16,15 @@ import (
 	"time"
 
 	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
 )
 
 const (
 	billingTimeout = 10 * time.Second
+	// aliasing a field (e.g. a: usage{...} b: usage{...} ...) multiplies
+	// resolver calls per request, so cap total query complexity.
+	maxQueryComplexity = 100
 )
 
 func limitBody(next http.Handler) http.Handler {
@@ -75,6 +79,7 @@ func main() {
 	graphqlHandler := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
 		Resolvers: resolver,
 	}))
+	graphqlHandler.Use(extension.FixedComplexityLimit(maxQueryComplexity))
 	http.Handle("/graphql", middleware.CheckJWT(limitBody(graphqlHandler)))
 
 	http.Handle("/", middleware.CheckJWT(http.HandlerFunc(chatHandler(anthropicClient, reporter, &wg))))
