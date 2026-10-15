@@ -92,21 +92,32 @@ func (sp *StripeReporter) GetUsage(ctx context.Context, customerID string, start
 	return inputTokens, outputTokens, nil
 }
 
+// maxSummaryWindow is Stripe's maximum range for a single meter event
+// summary query.
+const maxSummaryWindow = 35 * 24 * time.Hour
+
 func (sp *StripeReporter) getMeterUsage(ctx context.Context, meterID, customerID string, start, end time.Time) (int64, error) {
 
 	var total float64
-	for summary, err := range sp.meterEventSummaries.List(ctx, &stripe.BillingMeterEventSummaryListParams{
-		ID:        stripe.String(meterID),
-		Customer:  stripe.String(customerID),
-		StartTime: stripe.Int64(start.Unix()),
-		EndTime:   stripe.Int64(end.Unix()),
-	}) {
-		if err != nil {
-			return 0, err
+	for windowStart := start; windowStart.Before(end); windowStart = windowStart.Add(maxSummaryWindow) {
+		windowEnd := windowStart.Add(maxSummaryWindow)
+		if windowEnd.After(end) {
+			windowEnd = end
 		}
-		total += summary.AggregatedValue
-		//no ValueGroupingWindow set, so exactly one summary is expected
-		break
+
+		for summary, err := range sp.meterEventSummaries.List(ctx, &stripe.BillingMeterEventSummaryListParams{
+			ID:        stripe.String(meterID),
+			Customer:  stripe.String(customerID),
+			StartTime: stripe.Int64(windowStart.Unix()),
+			EndTime:   stripe.Int64(windowEnd.Unix()),
+		}) {
+			if err != nil {
+				return 0, err
+			}
+			total += summary.AggregatedValue
+			//no ValueGroupingWindow set, so exactly one summary is expected per window
+			break
+		}
 	}
 	return int64(total), nil
 }
