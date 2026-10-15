@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	v86 "github.com/stripe/stripe-go/v86"
+	stripe "github.com/stripe/stripe-go/v86"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -42,10 +42,10 @@ func (m *MockmeterEventCreator) EXPECT() *MockmeterEventCreatorMockRecorder {
 }
 
 // Create mocks base method.
-func (m *MockmeterEventCreator) Create(ctx context.Context, params *v86.BillingMeterEventCreateParams) (*v86.BillingMeterEvent, error) {
+func (m *MockmeterEventCreator) Create(ctx context.Context, params *stripe.BillingMeterEventCreateParams) (*stripe.BillingMeterEvent, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", ctx, params)
-	ret0, _ := ret[0].(*v86.BillingMeterEvent)
+	ret0, _ := ret[0].(*stripe.BillingMeterEvent)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -54,4 +54,42 @@ func (m *MockmeterEventCreator) Create(ctx context.Context, params *v86.BillingM
 func (mr *MockmeterEventCreatorMockRecorder) Create(ctx, params any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockmeterEventCreator)(nil).Create), ctx, params)
+}
+
+// MockmeterEventSummaryLister is a mock of meterEventSummaryLister interface.
+type MockmeterEventSummaryLister struct {
+	ctrl     *gomock.Controller
+	recorder *MockmeterEventSummaryListerMockRecorder
+	isgomock struct{}
+}
+
+// MockmeterEventSummaryListerMockRecorder is the mock recorder for MockmeterEventSummaryLister.
+type MockmeterEventSummaryListerMockRecorder struct {
+	mock *MockmeterEventSummaryLister
+}
+
+// NewMockmeterEventSummaryLister creates a new mock instance.
+func NewMockmeterEventSummaryLister(ctrl *gomock.Controller) *MockmeterEventSummaryLister {
+	mock := &MockmeterEventSummaryLister{ctrl: ctrl}
+	mock.recorder = &MockmeterEventSummaryListerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockmeterEventSummaryLister) EXPECT() *MockmeterEventSummaryListerMockRecorder {
+	return m.recorder
+}
+
+// List mocks base method.
+func (m *MockmeterEventSummaryLister) List(ctx context.Context, params *stripe.BillingMeterEventSummaryListParams) stripe.Seq2[*stripe.BillingMeterEventSummary, error] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", ctx, params)
+	ret0, _ := ret[0].(stripe.Seq2[*stripe.BillingMeterEventSummary, error])
+	return ret0
+}
+
+// List indicates an expected call of List.
+func (mr *MockmeterEventSummaryListerMockRecorder) List(ctx, params any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockmeterEventSummaryLister)(nil).List), ctx, params)
 }

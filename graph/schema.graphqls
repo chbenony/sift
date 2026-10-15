@@ -1,0 +1,24 @@
+type Usage {
+  inputTokens: Int!
+  outputTokens: Int!
+}
+
+type Message {
+  id: ID!
+  content: String!
+  stopReason: String!
+  usage: Usage!
+}
+
+input SendMessageInput {
+  model: String!
+  content: String!
+}
+
+type Query {
+  usage: Usage!
+}
+
+type Mutation {
+  sendMessage(input: SendMessageInput!): Message!
+}

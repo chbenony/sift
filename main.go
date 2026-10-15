@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sift/graph"
 	"sift/internal/anthropic"
 	"sift/internal/auth"
 	"sift/internal/billing"
@@ -14,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/99designs/gqlgen/graphql/handler"
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
 )
 
@@ -29,6 +31,8 @@ func main() {
 
 	// Stripe env variables
 	stripeApiKey := os.Getenv("STRIPE_API_KEY")
+	stripeTokensInputMeterId := os.Getenv("STRIPE_INPUT_TOKENS_METER_ID")
+	stripeTokensOutputMeterId := os.Getenv("STRIPE_OUTPUT_TOKENS_METER_ID")
 
 	//wait group
 	var wg sync.WaitGroup
@@ -50,7 +54,7 @@ func main() {
 		log.Fatalf("failed to create validator: %v", err)
 	}
 
-	reporter, err := billing.NewStripeReporter(stripeApiKey)
+	reporter, err := billing.NewStripeReporter(stripeApiKey, stripeTokensInputMeterId, stripeTokensOutputMeterId)
 	if err != nil {
 		log.Fatalf("failed to create new stripe reporter: %v", err)
 	}
@@ -59,6 +63,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create middleware: %v", err)
 	}
+
+	resolver := graph.NewResolver(anthropicClient, reporter, reporter, &wg)
+	graphqlHandler := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
+		Resolvers: resolver,
+	}))
+	http.Handle("/graphql", middleware.CheckJWT(graphqlHandler))
 
 	http.Handle("/", middleware.CheckJWT(http.HandlerFunc(chatHandler(anthropicClient, reporter, &wg))))
 	// TODO(hardening): no ReadHeaderTimeout/ReadTimeout configured, so a slow client can
