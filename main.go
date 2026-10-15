@@ -23,6 +23,13 @@ const (
 	billingTimeout = 10 * time.Second
 )
 
+func limitBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	// Auth0 env variables
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
@@ -68,7 +75,7 @@ func main() {
 	graphqlHandler := handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{
 		Resolvers: resolver,
 	}))
-	http.Handle("/graphql", middleware.CheckJWT(graphqlHandler))
+	http.Handle("/graphql", middleware.CheckJWT(limitBody(graphqlHandler)))
 
 	http.Handle("/", middleware.CheckJWT(http.HandlerFunc(chatHandler(anthropicClient, reporter, &wg))))
 	// TODO(hardening): no ReadHeaderTimeout/ReadTimeout configured, so a slow client can
