@@ -28,11 +28,26 @@ const (
 	// aliasing a field (e.g. a: usage{...} b: usage{...} ...) multiplies
 	// resolver calls per request, so cap total query complexity.
 	maxQueryComplexity = 100
+	allowedOrigin      = "http://localhost:5173"
 )
 
 func limitBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -93,7 +108,7 @@ func main() {
 	graphqlHandler.Use(extension.Introspection{})
 	graphqlHandler.Use(extension.AutomaticPersistedQuery{Cache: lru.New[string](100)})
 	graphqlHandler.Use(extension.FixedComplexityLimit(maxQueryComplexity))
-	http.Handle("/graphql", middleware.CheckJWT(limitBody(graphqlHandler)))
+	http.Handle("/graphql", corsMiddleware(middleware.CheckJWT(limitBody(graphqlHandler))))
 
 	http.Handle("/", middleware.CheckJWT(http.HandlerFunc(chatHandler(anthropicClient, reporter, &wg))))
 	// TODO(hardening): no ReadHeaderTimeout/ReadTimeout configured, so a slow client can
