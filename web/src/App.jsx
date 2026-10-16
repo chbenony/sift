@@ -11,6 +11,7 @@ function App() {
   const [usage, setUsage] = useState(null);
   const [message, setMessage] = useState("");
   const [reply, setReply] = useState(null);
+  const [error, setError] = useState(null);
   const {
     isAuthenticated,
     isLoading,
@@ -28,6 +29,11 @@ function App() {
       { input: { model: "claude-haiku-4-5-20251001", content: message } },
       getAccessTokenSilently,
     );
+    if (data.errors) {
+      setError(data.errors[0].message);
+      return;
+    }
+    setError(null);
     setReply(data.data.sendMessage);
   }
   return (
@@ -65,6 +71,7 @@ function App() {
       />
       <button onClick={sendMessage}>Send</button>
       {reply && <p>{reply.content}</p>}
+      {error && <p style={{ color: "red" }}>{error}</p>}
     </>
   );
 }

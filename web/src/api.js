@@ -1,6 +1,6 @@
 export async function callGraphQL(query, variables, getAccessToken) {
     const token = await getAccessToken()
-    const response = await fetch('/graphql', {method: 'POST', headers: {
+    const response = await fetch('http://localhost:9000/graphql', {method: 'POST', headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
     },
