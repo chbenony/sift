@@ -20,22 +20,37 @@ function App() {
     getAccessTokenSilently,
   } = useAuth0();
   async function fetchUsage() {
-    const data = await callGraphQL(USAGE_QUERY, {}, getAccessTokenSilently);
-    setUsage(data.data.usage);
-  }
-  async function sendMessage() {
-    const data = await callGraphQL(
-      SEND_MESSAGE_QUERY,
-      { input: { model: "claude-haiku-4-5-20251001", content: message } },
-      getAccessTokenSilently,
-    );
-    if (data.errors) {
-      setError(data.errors[0].message);
-      return;
+    try {
+      const data = await callGraphQL(USAGE_QUERY, {}, getAccessTokenSilently);
+      if (data.errors) {
+        setError(data.errors[0].message);
+        return;
+      }
+      setError(null);
+      setUsage(data.data.usage);
+    } catch (err) {
+      setError(err.message);
     }
-    setError(null);
-    setReply(data.data.sendMessage);
   }
+
+  async function sendMessage() {
+    try {
+      const data = await callGraphQL(
+        SEND_MESSAGE_QUERY,
+        { input: { model: "claude-haiku-4-5-20251001", content: message } },
+        getAccessTokenSilently,
+      );
+      if (data.errors) {
+        setError(data.errors[0].message);
+        return;
+      }
+      setError(null);
+      setReply(data.data.sendMessage);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <>
       {isLoading ? (
