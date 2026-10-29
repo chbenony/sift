@@ -113,7 +113,11 @@ func main() {
 	http.Handle("/", middleware.CheckJWT(http.HandlerFunc(chatHandler(anthropicClient, reporter, &wg))))
 	// TODO(hardening): no ReadHeaderTimeout/ReadTimeout configured, so a slow client can
 	// hold a connection open indefinitely. Deferred until this is past scaffolding.
-	srv := &http.Server{Addr: ":9000"}
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "9000"
+	}
+	srv := &http.Server{Addr: ":" + port}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
