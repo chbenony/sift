@@ -7,12 +7,12 @@ require (
 	github.com/auth0/go-jwt-middleware/v3 v3.2.0
 	github.com/google/uuid v1.6.0
 	github.com/stripe/stripe-go/v86 v86.1.1
-	github.com/vektah/gqlparser/v2 v2.5.36
+	github.com/vektah/gqlparser/v2 v2.5.64
 	go.uber.org/mock v0.6.0
 )
 
 require (
-	github.com/agnivade/levenshtein v1.2.1 // indirect
+	github.com/agnivade/levenshtein v1.2.2 // indirect
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
