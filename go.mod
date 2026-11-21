@@ -3,7 +3,7 @@ module sift
 go 1.26.5
 
 require (
-	github.com/99designs/gqlgen v0.17.94
+	github.com/99designs/gqlgen v0.17.98
 	github.com/auth0/go-jwt-middleware/v3 v3.4.0
 	github.com/google/uuid v1.6.0
 	github.com/stripe/stripe-go/v86 v86.4.2
@@ -31,11 +31,11 @@ require (
 	github.com/urfave/cli/v3 v3.14.0 // indirect
 	github.com/valyala/fastjson v1.6.7 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
-	golang.org/x/mod v0.38.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
-	golang.org/x/tools v0.48.0 // indirect
+	golang.org/x/mod v0.42.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/tools v0.52.0 // indirect
 )
 
 tool github.com/99designs/gqlgen
